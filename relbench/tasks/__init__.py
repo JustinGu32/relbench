@@ -8,7 +8,7 @@ import pooch
 
 from relbench.base import AutoCompleteTask, BaseTask, TaskType
 from relbench.datasets import get_dataset
-from relbench.tasks import amazon, avito, event, f1, hm, stack, trial
+from relbench.tasks import amazon, avito, event, f1, hm, stack, trial, ratebeer
 
 task_registry = defaultdict(dict)
 
@@ -345,3 +345,17 @@ register_task(
         ("salesdocumentitem", "ITEMINCOTERMSCLASSIFICATION"),
     ],
 )
+
+register_task("rel-ratebeer", "beer-recommendation", ratebeer.BeerRecommendationTask)
+register_task("rel-ratebeer", "user-favorite-beer", ratebeer.UserFavoriteBeerTask)
+register_task("rel-ratebeer", "active-user-favorite-beer", ratebeer.ActiveUserFavoriteBeerTask)
+register_task("rel-ratebeer", "active-user-favorite-beer-180d", ratebeer.ActiveUserFavoriteBeerTask180d)
+register_task("rel-ratebeer", "user-place-liked-beer", ratebeer.UserPlaceLikedBeerTask)
+register_task("rel-ratebeer", "user-liked-beer", ratebeer.UserLikedBeerTask)
+register_task("rel-ratebeer", "user-place", ratebeer.UserPlaceTask)
+register_task("rel-ratebeer", "very-active-user-favorite-beer-180d", ratebeer.VeryActiveUserFavoriteBeerTask180d)
+register_task("rel-ratebeer", "user-style-liked-beer", ratebeer.UserStyleLikedBeerTask)
+register_task("rel-ratebeer", "user-style-liked-brewer", ratebeer.UserStyleLikedBrewerTask)
+register_task("rel-ratebeer", "style-brewer", ratebeer.StyleBrewerTask)
+register_task("rel-ratebeer", "brewer-style", ratebeer.BrewerStyleTask)
+register_task("rel-ratebeer", "user-loved-beer", ratebeer.UserLovedBeerTask)

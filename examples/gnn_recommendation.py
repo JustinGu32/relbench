@@ -53,6 +53,7 @@ parser.add_argument(
     type=str,
     default=os.path.expanduser("~/.cache/relbench_examples"),
 )
+parser.add_argument("--readout_mode", type=str, default="logit_sum")
 args = parser.parse_args()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -147,6 +148,7 @@ model = Model(
     aggr=args.aggr,
     norm="layer_norm",
     shallow_list=[task.dst_entity_table] if args.use_shallow else [],
+    readout_mode=args.readout_mode,
 ).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
