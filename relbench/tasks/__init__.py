@@ -91,7 +91,7 @@ def get_task(dataset_name: str, task_name: str, download=False) -> BaseTask:
 
     if download:
         download_task(dataset_name, task_name)
-    dataset = get_dataset(dataset_name)
+    dataset = get_dataset(dataset_name, download=download)
     cls, args, kwargs = task_registry[dataset_name][task_name]
     task = cls(dataset, *args, **kwargs)
     return task
