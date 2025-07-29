@@ -81,8 +81,13 @@ class Model(torch.nn.Module):
         # Learnable gating for "gated_logit_sum"
         self.depth_logits_weight = torch.nn.Parameter(torch.zeros(num_layers + 1))
         # Shared MLP for concatenated features (feat_cat_mlp)
+        # For a two-layer MLP, `hidden_channels` must be specified. Use `channels` as
+        # the hidden size so the projection first reduces the concatenated feature
+        # vector back to the per-layer channel width before producing the final
+        # logits.
         self.readout_mlp = MLP(
-            (num_layers + 1) * channels,
+            (num_layers + 1) * channels,           # Input dimension (concat of all depths)
+            hidden_channels=channels,              # Hidden layer size
             out_channels=out_channels,
             norm=norm,
             num_layers=2,
