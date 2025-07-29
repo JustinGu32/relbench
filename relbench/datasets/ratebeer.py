@@ -4,8 +4,8 @@ from relbench.base import Dataset, Database, Table
 
 
 class RateBeerDataset(Dataset):
-    val_timestamp = pd.Timestamp("2024-07-01")
-    test_timestamp = pd.Timestamp("2024-10-01")
+    val_timestamp = pd.Timestamp("2021-01-01")
+    test_timestamp = pd.Timestamp("2023-01-01")
 
     def make_db(self) -> Database:
         con = duckdb.connect()
@@ -27,11 +27,12 @@ class RateBeerDataset(Dataset):
             "producer_style",           # 100% NA
             "LogoImage",                # 92.45% NA
             "beer_jobber_id",           # 99.65% NA
-            # "updated_at",               # 62.80% NA
-            # "updated_by",               # 58.74% NA
-            # "year4_overall",            # 76.74% NA
-            # "last_9m_avg",              # 72.41% NA
+            "year4_style",              # 94.35% NA
+            "year4_overall",            # 94.16% NA
             # "rating_std_dev",           # 15.61% NA
+            # "last_9m_avg",              # 86.82% NA
+            # "style_percentile",         # 79.37% NA
+            # "overall_percentile",       # 79.37% NA
         ], inplace=True)
 
         tables["beers"] = Table(
