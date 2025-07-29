@@ -4,8 +4,8 @@ from relbench.base import Dataset, Database, Table
 
 
 class RateBeerDataset(Dataset):
-    val_timestamp = pd.Timestamp("2021-01-01")
-    test_timestamp = pd.Timestamp("2023-01-01")
+    val_timestamp = pd.Timestamp("2024-07-01")
+    test_timestamp = pd.Timestamp("2024-10-01")
 
     def make_db(self) -> Database:
         con = duckdb.connect()
@@ -216,45 +216,45 @@ class RateBeerDataset(Dataset):
         )
 
         # ---------------------- Reindex pkeys/fkeys ----------------------
-        # def _reindex_primary_and_foreign_keys(table_dict):
-        #     pk_maps = {}
-        #     for name, tbl in table_dict.items():
-        #         pk_col = tbl.pkey_col
-        #         if pk_col is None:
-        #             continue
-        #         if tbl.df[pk_col].duplicated().any():
-        #             dup_cnt = int(tbl.df[pk_col].duplicated().sum())
-        #             raise ValueError(
-        #                 f"Table '{name}' contains {dup_cnt} duplicate values "
-        #                 f"in primary key column '{pk_col}'. Deduplicate first."
-        #             )
-        #         unique_ids = (
-        #             pd.Index(tbl.df[pk_col].unique())
-        #             .sort_values()
-        #             .astype(tbl.df[pk_col].dtype)
-        #         )
-        #         mapping = dict(zip(unique_ids, range(len(unique_ids))))
-        #         pk_maps[name] = mapping
+        def _reindex_primary_and_foreign_keys(table_dict):
+            pk_maps = {}
+            for name, tbl in table_dict.items():
+                pk_col = tbl.pkey_col
+                if pk_col is None:
+                    continue
+                if tbl.df[pk_col].duplicated().any():
+                    dup_cnt = int(tbl.df[pk_col].duplicated().sum())
+                    raise ValueError(
+                        f"Table '{name}' contains {dup_cnt} duplicate values "
+                        f"in primary key column '{pk_col}'. Deduplicate first."
+                    )
+                unique_ids = (
+                    pd.Index(tbl.df[pk_col].unique())
+                    .sort_values()
+                    .astype(tbl.df[pk_col].dtype)
+                )
+                mapping = dict(zip(unique_ids, range(len(unique_ids))))
+                pk_maps[name] = mapping
 
-        #     for name, tbl in table_dict.items():
-        #         pk_col = tbl.pkey_col
-        #         if pk_col is None:
-        #             continue
-        #         tbl.df[pk_col] = tbl.df[pk_col].map(pk_maps[name]).astype("int64")
+            for name, tbl in table_dict.items():
+                pk_col = tbl.pkey_col
+                if pk_col is None:
+                    continue
+                tbl.df[pk_col] = tbl.df[pk_col].map(pk_maps[name]).astype("int64")
 
-        #     for name, tbl in table_dict.items():
-        #         for fk_col, ref_table in tbl.fkey_col_to_pkey_table.items():
-        #             if ref_table not in pk_maps:
-        #                 raise KeyError(
-        #                     f"Reference table '{ref_table}' for FK '{name}.{fk_col}' "
-        #                     "has no primary-key mapping."
-        #                 )
-        #             mapped_series = tbl.df[fk_col].map(pk_maps[ref_table])
-        #             if mapped_series.isna().any():
-        #                 tbl.df[fk_col] = mapped_series.astype("Int64")
-        #             else:
-        #                 tbl.df[fk_col] = mapped_series.astype("int64")
+            for name, tbl in table_dict.items():
+                for fk_col, ref_table in tbl.fkey_col_to_pkey_table.items():
+                    if ref_table not in pk_maps:
+                        raise KeyError(
+                            f"Reference table '{ref_table}' for FK '{name}.{fk_col}' "
+                            "has no primary-key mapping."
+                        )
+                    mapped_series = tbl.df[fk_col].map(pk_maps[ref_table])
+                    if mapped_series.isna().any():
+                        tbl.df[fk_col] = mapped_series.astype("Int64")
+                    else:
+                        tbl.df[fk_col] = mapped_series.astype("int64")
 
-        # _reindex_primary_and_foreign_keys(tables)
+        _reindex_primary_and_foreign_keys(tables)
 
         return Database(table_dict=tables)
