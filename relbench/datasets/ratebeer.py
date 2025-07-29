@@ -27,8 +27,8 @@ class RateBeerDataset(Dataset):
             "producer_style",           # 100% NA
             "LogoImage",                # 92.45% NA
             "beer_jobber_id",           # 99.65% NA
-            "year4_style",              # 94.35% NA
-            "year4_overall",            # 94.16% NA
+            # "year4_style",              # 94.35% NA
+            # "year4_overall",            # 94.16% NA
             # "rating_std_dev",           # 15.61% NA
             # "last_9m_avg",              # 86.82% NA
             # "style_percentile",         # 79.37% NA
