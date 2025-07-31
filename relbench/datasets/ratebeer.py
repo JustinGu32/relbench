@@ -4,8 +4,8 @@ from relbench.base import Dataset, Database, Table
 
 
 class RateBeerDataset(Dataset):
-    val_timestamp = pd.Timestamp("2024-07-01")
-    test_timestamp = pd.Timestamp("2024-10-01")
+    val_timestamp = pd.Timestamp("2021-01-01")
+    test_timestamp = pd.Timestamp("2023-01-01")
 
     def make_db(self) -> Database:
         con = duckdb.connect()
