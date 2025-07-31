@@ -18,6 +18,11 @@ from torch_geometric.loader import NeighborLoader
 from torch_geometric.seed import seed_everything
 from tqdm import tqdm
 
+# TensorBoard imports
+from torch.utils.tensorboard import SummaryWriter
+import datetime
+# End TensorBoard
+
 from relbench.base import Dataset, RecommendationTask, TaskType
 from relbench.datasets import get_dataset
 from relbench.modeling.graph import get_link_train_table_input, make_pkey_fkey_graph
@@ -60,6 +65,13 @@ parser.add_argument(
     help="Skip-connection readout: one of {logit_sum, gated_logit_sum, feat_cat_mlp}. If omitted, uses baseline (no skip).",
 )
 args = parser.parse_args()
+
+# ───────────────── TensorBoard setup ─────────────────
+run_id = f"{args.dataset}_{args.task}_{datetime.datetime.now():%Y%m%d-%H%M%S}"
+log_dir = Path(args.cache_dir) / "tb_runs" / run_id
+writer = SummaryWriter(log_dir=str(log_dir))
+print(f"[TensorBoard] Writing to {log_dir}")
+# ─────────────────────────────────────────────────────
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available():
@@ -236,9 +248,16 @@ state_dict = None
 best_val_metric = 0
 for epoch in range(1, args.epochs + 1):
     train_loss = train()
+    # TensorBoard: log train loss every epoch
+    writer.add_scalar("Loss/train", train_loss, epoch)
+    # End TensorBoard
     if epoch % args.eval_epochs_interval == 0:
         val_pred = test(*eval_loaders_dict["val"])
         val_metrics = task.evaluate(val_pred, task.get_table("val"))
+        # TensorBoard: log validation metrics
+        for name, value in val_metrics.items():
+            writer.add_scalar(f"{name}/val", value, epoch)
+        # End TensorBoard
         print(
             f"Epoch: {epoch:02d}, Train loss: {train_loss}, "
             f"Val metrics: {val_metrics}"
@@ -256,4 +275,10 @@ print(f"Best Val metrics: {val_metrics}")
 
 test_pred = test(*eval_loaders_dict["test"])
 test_metrics = task.evaluate(test_pred)
+# TensorBoard: log test metrics
+for name, value in test_metrics.items():
+    writer.add_scalar(f"{name}/test", value, args.epochs + 1)
+# Close TensorBoard writer
+writer.close()
+# End TensorBoard
 print(f"Best test metrics: {test_metrics}")

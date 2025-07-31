@@ -17,6 +17,11 @@ from torch_frame.gbdt import LightGBM
 from torch_frame.typing import Metric
 from torch_geometric.seed import seed_everything
 
+# TensorBoard imports
+from torch.utils.tensorboard import SummaryWriter
+import datetime
+# End TensorBoard
+
 from relbench.base import Dataset, RecommendationTask, Table
 from relbench.datasets import get_dataset
 from relbench.modeling.utils import get_stype_proposal, remove_pkey_fkey
@@ -42,6 +47,13 @@ parser.add_argument(
     default=os.path.expanduser("~/.cache/relbench_examples"),
 )
 args = parser.parse_args()
+
+# ───────────────── TensorBoard setup ─────────────────
+run_id = f"{args.dataset}_{args.task}_{datetime.datetime.now():%Y%m%d-%H%M%S}"
+log_dir = Path(args.cache_dir) / "tb_runs" / run_id
+writer = SummaryWriter(log_dir=str(log_dir))
+print(f"[TensorBoard] Writing to {log_dir}")
+# ─────────────────────────────────────────────────────
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available():
@@ -436,6 +448,11 @@ train_metrics = evaluate(
 )
 print(f"Train: {train_metrics}")
 
+# TensorBoard: log train metrics
+for name, value in train_metrics.items():
+    writer.add_scalar(f"{name}/train", value, 0)
+# End TensorBoard
+
 pred = model.predict(tf_test=tf_val_pred).numpy()
 lightgbm_output = val_df_pred
 lightgbm_output[PRED_SCORE_COL_NAME] = pred
@@ -451,6 +468,10 @@ val_metrics = evaluate(
 )
 print(f"Val: {val_metrics}")
 
+# TensorBoard: log validation metrics
+for name, value in val_metrics.items():
+    writer.add_scalar(f"{name}/val", value, 1)
+# End TensorBoard
 
 pred = model.predict(tf_test=tf_test).numpy()
 lightgbm_output = dfs["test"]
@@ -466,3 +487,10 @@ test_metrics = evaluate(
     task,
 )
 print(f"Test: {test_metrics}")
+
+# TensorBoard: log test metrics and close writer
+for name, value in test_metrics.items():
+    writer.add_scalar(f"{name}/test", value, 2)
+
+writer.close()
+# End TensorBoard
