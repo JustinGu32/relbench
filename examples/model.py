@@ -34,15 +34,15 @@ class Model(torch.nn.Module):
         shallow_list: List[NodeType] = [],
         id_awareness: bool = False,
         # New -----------------------------------------------------------------
-        readout_mode: str = "logit_sum",
+        readout_mode: Optional[str] = None,
         final_dropout: float = 0.0,
     ):
         super().__init__()
 
-        assert readout_mode in {"logit_sum", "gated_logit_sum", "feat_cat_mlp"}, (
-            "readout_mode must be one of 'logit_sum', 'gated_logit_sum', 'feat_cat_mlp'"
+        assert readout_mode in {None, "logit_sum", "gated_logit_sum", "feat_cat_mlp"}, (
+            "readout_mode must be None, 'logit_sum', 'gated_logit_sum', or 'feat_cat_mlp'"
         )
-        self.readout_mode = readout_mode
+        self.readout_mode: Optional[str] = readout_mode
         self.final_dropout = final_dropout
         self.num_layers = num_layers
         self.channels = channels
@@ -71,27 +71,28 @@ class Model(torch.nn.Module):
         )
 
         # ---------------------------------------------------------------------
-        # Depth-wise read-out heads
-        # ---------------------------------------------------------------------
-        # For modes operating in logit space we need one head per depth (input + each layer).
-        self.heads = torch.nn.ModuleList(
-            [MLP(channels, out_channels=out_channels, norm=norm, num_layers=1)
-             for _ in range(num_layers + 1)]
-        )
-        # Learnable gating for "gated_logit_sum"
-        self.depth_logits_weight = torch.nn.Parameter(torch.zeros(num_layers + 1))
-        # Shared MLP for concatenated features (feat_cat_mlp)
-        # For a two-layer MLP, `hidden_channels` must be specified. Use `channels` as
-        # the hidden size so the projection first reduces the concatenated feature
-        # vector back to the per-layer channel width before producing the final
-        # logits.
-        self.readout_mlp = MLP(
-            (num_layers + 1) * channels,           # Input dimension (concat of all depths)
-            hidden_channels=channels,              # Hidden layer size
-            out_channels=out_channels,
-            norm=norm,
-            num_layers=2,
-        )
+        # Depth-wise read-out heads (only if skip connections enabled)
+        if self.readout_mode is None:
+            # Baseline: a single head applied to the final GNN layer output
+            self.head = MLP(
+                channels, out_channels=out_channels, norm=norm, num_layers=1
+            )
+        else:
+            # For modes operating in logit space we need one head per depth (input + each layer).
+            self.heads = torch.nn.ModuleList(
+                [MLP(channels, out_channels=out_channels, norm=norm, num_layers=1)
+                 for _ in range(num_layers + 1)]
+            )
+            # Learnable gating for "gated_logit_sum"
+            self.depth_logits_weight = torch.nn.Parameter(torch.zeros(num_layers + 1))
+            # Shared MLP for concatenated features (feat_cat_mlp)
+            self.readout_mlp = MLP(
+                (num_layers + 1) * channels,           # Input dimension (concat of all depths)
+                hidden_channels=channels,              # Hidden layer size
+                out_channels=out_channels,
+                norm=norm,
+                num_layers=2,
+            )
 
         # Optional shallow embeddings per node type
         self.embedding_dict = ModuleDict({
@@ -112,15 +113,18 @@ class Model(torch.nn.Module):
         self.encoder.reset_parameters()
         self.temporal_encoder.reset_parameters()
         self.gnn.reset_parameters()
-        for head in self.heads:
-            head.reset_parameters()
-        self.readout_mlp.reset_parameters()
+        if self.readout_mode is None:
+            self.head.reset_parameters()
+        else:
+            for head in self.heads:
+                head.reset_parameters()
+            self.readout_mlp.reset_parameters()
+            with torch.no_grad():
+                self.depth_logits_weight.zero_()
         for emb in self.embedding_dict.values():
             torch.nn.init.normal_(emb.weight, std=0.1)
         if self.id_awareness_emb is not None:
             self.id_awareness_emb.reset_parameters()
-        with torch.no_grad():
-            self.depth_logits_weight.zero_()
 
     def _encode_inputs(
         self,
@@ -169,6 +173,9 @@ class Model(torch.nn.Module):
     # Read-out helpers
     # ------------------------------------------------------------------
     def _readout_node_task(self, hidden, entity_table: NodeType, seed_n: int) -> Tensor:
+        if self.readout_mode is None:
+            return self.head(hidden[-1][entity_table][:seed_n])
+
         if self.readout_mode == "logit_sum":
             logits = 0
             for depth, x_d in enumerate(hidden):
@@ -191,6 +198,9 @@ class Model(torch.nn.Module):
         return self.readout_mlp(x_cat)
 
     def _readout_dst_task(self, hidden, dst_table: NodeType) -> Tensor:
+        if self.readout_mode is None:
+            return self.head(hidden[-1][dst_table])
+
         if self.readout_mode == "logit_sum":
             logits = 0
             for depth, x_d in enumerate(hidden):

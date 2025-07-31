@@ -53,7 +53,12 @@ parser.add_argument(
     type=str,
     default=os.path.expanduser("~/.cache/relbench_examples"),
 )
-parser.add_argument("--readout_mode", type=str, default="logit_sum")
+parser.add_argument(
+    "--readout_mode",
+    type=str,
+    default=None,
+    help="Skip-connection readout: one of {logit_sum, gated_logit_sum, feat_cat_mlp}. If omitted, uses baseline (no skip).",
+)
 args = parser.parse_args()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
