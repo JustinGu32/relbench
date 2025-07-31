@@ -745,7 +745,7 @@ class UserLovedBeerTask(RecommendationTask):
     dst_entity_col = "beer_id"
     dst_entity_table = "beers"
     time_col = "timestamp"
-    timedelta = pd.Timedelta(days=180)
+    timedelta = pd.Timedelta(days=90)
     metrics = [link_prediction_precision, link_prediction_recall, link_prediction_map, link_prediction_mrr]
     eval_k = 10
 
