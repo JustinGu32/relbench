@@ -19,6 +19,12 @@ from torch_geometric.seed import seed_everything
 from torch_geometric.typing import NodeType
 from tqdm import tqdm
 
+# TensorBoard imports
+from torch.utils.tensorboard import SummaryWriter
+import datetime
+# End TensorBoard
+
+
 from relbench.base import Dataset, RecommendationTask, TaskType
 from relbench.datasets import get_dataset
 from relbench.modeling.graph import get_link_train_table_input, make_pkey_fkey_graph
@@ -46,14 +52,22 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+# ───────────────── TensorBoard setup ─────────────────
+run_id = f"{args.dataset}_{args.task}_idgnn_hop{args.num_layers}_readoutNONE_pooch"
+log_dir = Path(args.cache_dir) / "tb_runs" / run_id
+writer = SummaryWriter(log_dir=str(log_dir))
+print(f"[TensorBoard] Writing to {log_dir}")
+# ─────────────────────────────────────────────────────
+
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available():
     torch.set_num_threads(1)
 seed_everything(args.seed)
 
-dataset: Dataset = get_dataset(args.dataset, download=True)
-task: RecommendationTask = get_task(args.dataset, args.task, download=True)
+dataset: Dataset = get_dataset(args.dataset, download=False)
+task: RecommendationTask = get_task(args.dataset, args.task, download=False)
 tune_metric = "link_prediction_map"
 assert task.task_type == TaskType.LINK_PREDICTION
 
@@ -195,9 +209,16 @@ state_dict = None
 best_val_metric = 0
 for epoch in range(1, args.epochs + 1):
     train_loss = train()
+    # TensorBoard: log train loss every epoch
+    writer.add_scalar("Loss/train", train_loss, epoch)
+    # End TensorBoard
     if epoch % args.eval_epochs_interval == 0:
         val_pred = test(loader_dict["val"])
         val_metrics = task.evaluate(val_pred, task.get_table("val"))
+        # TensorBoard: log validation metrics
+        for name, value in val_metrics.items():
+            writer.add_scalar(f"{name}/val", value, epoch)
+        # End TensorBoard
         print(
             f"Epoch: {epoch:02d}, Train loss: {train_loss}, "
             f"Val metrics: {val_metrics}"
@@ -215,4 +236,10 @@ print(f"Best Val metrics: {val_metrics}")
 
 test_pred = test(loader_dict["test"])
 test_metrics = task.evaluate(test_pred)
+# TensorBoard: log test metrics
+for name, value in test_metrics.items():
+    writer.add_scalar(f"{name}/test", value, args.epochs + 1)
+# Close TensorBoard writer
+writer.close()
+# End TensorBoard
 print(f"Best test metrics: {test_metrics}")
