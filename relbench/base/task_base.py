@@ -186,7 +186,7 @@ class BaseTask:
             table = self._get_table(split)
             toc = time.time()
             print(f"Done in {toc - tic:.2f} seconds.")
-
+            print(f"Task {split} table rows: {len(table.df)}")
             if self.cache_dir:
                 table.save(table_path)
 
