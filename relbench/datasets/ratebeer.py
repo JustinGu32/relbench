@@ -15,8 +15,8 @@ DB_URL = "https://www.dropbox.com/scl/fi/exwygxep7vdvq55uiq28r/db.zip?rlkey=o7q0
 # CACHE_DIR = "/lfs/madmax2/0/akhatua/relbench_cache/rel-ratebeer/testing"
 
 class RateBeerDataset(Dataset):
-    val_timestamp = pd.Timestamp("2021-01-01")
-    test_timestamp = pd.Timestamp("2023-01-01")
+    val_timestamp = pd.Timestamp("2018-09-01")
+    test_timestamp = pd.Timestamp("2020-01-01")
 
     name = "rel-ratebeer" 
 

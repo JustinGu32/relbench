@@ -20,8 +20,8 @@ args = parser.parse_args()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 seed_everything(args.seed)
 
-dataset: Dataset = get_dataset(args.dataset, download=True)
-task: EntityTask = get_task(args.dataset, args.task, download=True)
+dataset: Dataset = get_dataset(args.dataset, download=False)
+task: EntityTask = get_task(args.dataset, args.task, download=False)
 
 train_table = task.get_table("train")
 val_table = task.get_table("val")

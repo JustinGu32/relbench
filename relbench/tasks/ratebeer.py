@@ -39,6 +39,378 @@ def link_prediction_mrr(
 
     return float(np.mean(reciprocal_ranks))
 
+# Entity Classification tasks
+
+class BeerRatingChurnTask(EntityTask):
+    r"""Predict whether a beer will receive a rating in the next 90 days."""
+
+    task_type = TaskType.BINARY_CLASSIFICATION
+    entity_col = "beer_id"
+    entity_table = "beers"
+    time_col = "timestamp"
+    target_col = "rating_churn"
+    timedelta = pd.Timedelta(days=90)
+    metrics = [accuracy, average_precision, f1, roc_auc]
+
+    def make_table(self, db: Database, timestamps: "pd.Series[pd.Timestamp]") -> Table:
+        beers = db.table_dict["beers"].df
+        beer_ratings = db.table_dict["beer_ratings"].df
+        timestamp_df = pd.DataFrame({"timestamp": timestamps})
+
+        df = duckdb.sql(
+            f"""
+            SELECT
+                t.timestamp,
+                b.beer_id AS beer_id,
+                CAST(
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM beer_ratings
+                        WHERE
+                            beer_ratings.beer_id = b.beer_id
+                            AND beer_ratings.created_at > t.timestamp
+                            AND beer_ratings.created_at <= t.timestamp + INTERVAL '{self.timedelta}'
+                    ) AS INTEGER
+                ) AS rating_churn
+            FROM
+                timestamp_df t,
+                beers b
+            WHERE
+                EXISTS (
+                    SELECT 1
+                    FROM beer_ratings AS br2
+                    WHERE
+                        br2.beer_id = b.beer_id
+                        AND br2.created_at > t.timestamp - INTERVAL '{self.timedelta}'
+                        AND br2.created_at <= t.timestamp
+                )
+            GROUP BY
+                t.timestamp,
+                b.beer_id
+            """
+        ).df()
+
+        return Table(
+            df=df,
+            fkey_col_to_pkey_table={self.entity_col: self.entity_table},
+            pkey_col=None,
+            time_col=self.time_col,
+        )
+ 
+class UserRatingChurnTask(EntityTask):
+    r"""Predict whether a user will give a beer rating in the next 90 days."""
+
+    task_type = TaskType.BINARY_CLASSIFICATION
+    entity_col = "user_id"
+    entity_table = "users"
+    time_col = "timestamp"
+    target_col = "user_churn"
+    timedelta = pd.Timedelta(days=90)
+    metrics = [accuracy, average_precision, f1, roc_auc]
+
+    def make_table(self, db: Database, timestamps: "pd.Series[pd.Timestamp]") -> Table:
+        users = db.table_dict["users"].df
+        beer_ratings = db.table_dict["beer_ratings"].df
+        timestamp_df = pd.DataFrame({"timestamp": timestamps})
+
+        df = duckdb.sql(
+            f"""
+            SELECT
+                t.timestamp,
+                u.user_id AS user_id,
+                CAST(
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM beer_ratings
+                        WHERE
+                            beer_ratings.user_id = u.user_id
+                            AND beer_ratings.created_at > t.timestamp
+                            AND beer_ratings.created_at <= t.timestamp + INTERVAL '{self.timedelta}'
+                    ) AS INTEGER
+                ) AS user_churn
+            FROM
+                timestamp_df t,
+                users u
+            WHERE
+                EXISTS (
+                    SELECT 1
+                    FROM beer_ratings AS br2
+                    WHERE
+                        br2.user_id = u.user_id
+                        AND br2.created_at > t.timestamp - INTERVAL '{self.timedelta}'
+                        AND br2.created_at <= t.timestamp
+                )
+            GROUP BY
+                t.timestamp,
+                u.user_id
+            """
+        ).df()
+
+        return Table(
+            df=df,
+            fkey_col_to_pkey_table={self.entity_col: self.entity_table},
+            pkey_col=None,
+            time_col=self.time_col,
+        )
+
+class BrewerDormantTask(EntityTask):
+    r"""Predict whether a brewer will release zero beers in the next 365 days."""
+    
+    task_type = TaskType.BINARY_CLASSIFICATION
+    entity_col = "brewer_id"
+    entity_table = "brewers"
+    time_col = "timestamp"
+    target_col = "dormant"
+    timedelta = pd.Timedelta(days=365)
+    metrics = [accuracy, average_precision, f1, roc_auc]
+
+    def make_table(self, db: Database, timestamps: "pd.Series[pd.Timestamp]") -> Table:
+        brewers = db.table_dict["brewers"].df
+        beers = db.table_dict["beers"].df
+        timestamp_df = pd.DataFrame({"timestamp": timestamps})
+
+        df = duckdb.sql(
+            f"""
+            SELECT
+                t.timestamp,
+                brew.brewer_id AS brewer_id,
+                CAST(
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM beers
+                        WHERE
+                            beers.brewer_id = brew.brewer_id
+                            AND beers.created_at > t.timestamp
+                            AND beers.created_at <= t.timestamp + INTERVAL '{self.timedelta}'    
+                    ) AS INTEGER
+                ) AS dormant
+            FROM
+                timestamp_df t,
+                brewers brew
+            WHERE
+                EXISTS (
+                    SELECT 1
+                    FROM beers AS b2
+                    WHERE
+                        b2.brewer_id = brew.brewer_id
+                        AND b2.created_at > t.timestamp - INTERVAL '{self.timedelta}'
+                        AND b2.created_at <= t.timestamp
+                )
+            GROUP BY
+                t.timestamp,
+                brew.brewer_id
+            """
+        ).df()
+
+        return Table(
+            df=df,
+            fkey_col_to_pkey_table={self.entity_col: self.entity_table},
+            pkey_col=None,
+            time_col=self.time_col,
+        )
+
+
+# Entity Regression tasks
+
+class PopularBeerRatingCountTask(EntityTask):
+    r"""Predict the number of ratings that a popular beer (>= 10 ratings and 4.0 / 5.0 score) will receive in the next 180 days."""
+
+    task_type = TaskType.REGRESSION
+    entity_col = "beer_id"
+    entity_table = "beers"
+    time_col = "timestamp"
+    target_col = "num_ratings"
+    timedelta = pd.Timedelta(days=180)
+    metrics = [r2, mae, rmse]
+
+    def make_table(self, db: Database, timestamps: "pd.Series[pd.Timestamp]") -> Table:
+        beers = db.table_dict["beers"].df
+        beer_ratings = db.table_dict["beer_ratings"].df
+        timestamp_df = pd.DataFrame({"timestamp": timestamps})
+
+        df = duckdb.sql(f"""
+            WITH
+            grid AS (
+                SELECT t.timestamp, b.beer_id
+                FROM timestamp_df AS t
+                CROSS JOIN beers AS b
+            ),
+            popular_beers AS (
+                SELECT
+                    g.timestamp,
+                    g.beer_id
+                FROM grid AS g
+                JOIN beer_ratings AS br
+                ON br.beer_id = g.beer_id
+                AND br.created_at >  g.timestamp - INTERVAL '{self.timedelta} days'
+                AND br.created_at <= g.timestamp
+                GROUP BY g.timestamp, g.beer_id
+                HAVING
+                    COUNT(*)               >= 10      -- at least 10 ratings
+                    AND AVG(br.total_score) >= 4.0     -- average score ≥ 4.0
+            )
+            SELECT
+                p.timestamp,
+                p.beer_id,
+                (
+                    SELECT COUNT(*)
+                    FROM beer_ratings AS br_fut
+                    WHERE br_fut.beer_id    = p.beer_id
+                    AND br_fut.created_at >  p.timestamp
+                    AND br_fut.created_at <= p.timestamp + INTERVAL '{self.timedelta} days'
+                ) AS num_ratings
+            FROM popular_beers AS p
+            """
+        ).df()
+
+
+        return Table(
+            df=df,
+            fkey_col_to_pkey_table={self.entity_col: self.entity_table},
+            pkey_col=None,
+            time_col=self.time_col,
+        )
+
+class BeerRatingCountTask(EntityTask):
+    r"""Predict the number of beer ratings that a beer will receive in the next 90 days."""
+
+    task_type = TaskType.REGRESSION
+    entity_col = "beer_id"
+    entity_table = "beers"
+    time_col = "timestamp"
+    target_col = "num_ratings"
+    timedelta = pd.Timedelta(days=90)
+    metrics = [r2, mae, rmse]
+
+    def make_table(self, db: Database, timestamps: "pd.Series[pd.Timestamp]") -> Table:
+        beers = db.table_dict["beers"].df
+        beer_ratings = db.table_dict["beer_ratings"].df
+        timestamp_df = pd.DataFrame({"timestamp": timestamps})
+
+        df = duckdb.sql(
+            f"""
+            SELECT
+                t.timestamp,
+                b.beer_id,
+                (
+                    SELECT COUNT(*)
+                    FROM beer_ratings br
+                    WHERE br.beer_id = b.beer_id
+                    AND br.created_at >  t.timestamp
+                    AND br.created_at <= t.timestamp + INTERVAL '{self.timedelta}'
+                ) AS num_ratings
+            FROM timestamp_df t
+            CROSS JOIN beers b
+            """
+        ).df()
+
+        return Table(
+            df=df,
+            fkey_col_to_pkey_table={self.entity_col: self.entity_table},
+            pkey_col=None,
+            time_col=self.time_col,
+        )
+
+class UserRatingCountTask(EntityTask):
+    r"""Predict the number of beer ratings that a user will give in the next 90 days."""
+
+    task_type = TaskType.REGRESSION
+    entity_col = "user_id"
+    entity_table = "users"
+    time_col = "timestamp"
+    target_col = "num_ratings"
+    timedelta = pd.Timedelta(days=90)
+    metrics = [r2, mae, rmse]
+
+    def make_table(self, db: Database, timestamps: "pd.Series[pd.Timestamp]") -> Table:
+        users = db.table_dict["users"].df
+        beer_ratings = db.table_dict["beer_ratings"].df
+        timestamp_df = pd.DataFrame({"timestamp": timestamps})
+
+        df = duckdb.sql(
+            f"""
+            SELECT
+                t.timestamp,
+                u.user_id,
+                (
+                    SELECT COUNT(*)
+                    FROM beer_ratings br
+                    WHERE br.user_id = u.user_id
+                    AND br.created_at >  t.timestamp
+                    AND br.created_at <= t.timestamp + INTERVAL '{self.timedelta}'
+                ) AS num_ratings
+            FROM timestamp_df t
+            CROSS JOIN users u
+            WHERE
+                EXISTS (
+                    SELECT 1
+                    FROM beer_ratings AS br2
+                    WHERE br2.user_id = u.user_id
+                    AND br2.created_at > t.timestamp - INTERVAL '{self.timedelta}'
+                    AND br2.created_at <= t.timestamp
+                )
+            """
+        ).df()
+
+        return Table(
+            df=df,
+            fkey_col_to_pkey_table={self.entity_col: self.entity_table},
+            pkey_col=None,
+            time_col=self.time_col,
+        )
+
+class BrewerABVTask(EntityTask):
+    r"""Predict the average alcohol percentage of beers that a brewer will release in the next 90 days."""
+
+    task_type = TaskType.REGRESSION
+    entity_col = "brewer_id"
+    entity_table = "brewers"
+    time_col = "timestamp"
+    target_col = "avg_abv"
+    timedelta = pd.Timedelta(days=90)
+    metrics = [r2, mae, rmse]
+
+    def make_table(self, db: Database, timestamps: "pd.Series[pd.Timestamp]") -> Table:
+        brewers = db.table_dict["brewers"].df
+        beers = db.table_dict["beers"].df
+        timestamp_df = pd.DataFrame({"timestamp": timestamps})
+
+        df = duckdb.sql(
+            f"""
+            SELECT
+                t.timestamp,
+                b.brewer_id,
+                (
+                    SELECT AVG(b.alcohol_pct)
+                    FROM beers b
+                    WHERE b.brewer_id = b.brewer_id
+                    AND b.created_at >  t.timestamp
+                    AND b.created_at <= t.timestamp + INTERVAL '{self.timedelta}'
+                ) AS avg_abv
+            FROM timestamp_df t
+            CROSS JOIN brewers b
+            WHERE
+                EXISTS (
+                    SELECT 1
+                    FROM beers AS b2
+                    WHERE b2.brewer_id = b.brewer_id
+                    AND b2.created_at > t.timestamp - INTERVAL '{self.timedelta}'
+                    AND b2.created_at <= t.timestamp
+                )
+            """
+        ).df()
+
+        return Table(
+            df=df,
+            fkey_col_to_pkey_table={self.entity_col: self.entity_table},
+            pkey_col=None,
+            time_col=self.time_col,
+        )
+
+
+
+
+# Recommendation tasks
 
 class UserFavoriteBeerTask(RecommendationTask):
     r"""Predict the list of distinct beers each active user will add to their favorites in the next 90 days."""
@@ -57,6 +429,7 @@ class UserFavoriteBeerTask(RecommendationTask):
         users = db.table_dict["users"].df
         beers = db.table_dict["beers"].df
         favorites = db.table_dict["favorites"].df
+        beer_ratings = db.table_dict["beer_ratings"].df
         timestamp_df = pd.DataFrame({"timestamp": timestamps})
 
         df = duckdb.sql(
@@ -76,10 +449,10 @@ class UserFavoriteBeerTask(RecommendationTask):
                 f.user_id is not null and f.beer_id is not null
                 AND EXISTS (
                     SELECT 1
-                    FROM favorites as f2
-                    WHERE f2.user_id = f.user_id
-                    AND f2.created_at > t.timestamp - INTERVAL '{self.timedelta} days'
-                    AND f2.created_at <= t.timestamp
+                    FROM beer_ratings as br
+                    WHERE br.user_id = f.user_id
+                    AND br.created_at > t.timestamp - INTERVAL '{self.timedelta} days'
+                    AND br.created_at <= t.timestamp
                 )
             GROUP BY
                 t.timestamp,
@@ -114,6 +487,7 @@ class UserLikedPlaceTask(RecommendationTask):
         users = db.table_dict["users"].df
         places = db.table_dict["places"].df
         place_ratings = db.table_dict["place_ratings"].df
+        beer_ratings = db.table_dict["beer_ratings"].df
         timestamp_df = pd.DataFrame({"timestamp": timestamps})
 
         df = duckdb.sql(
@@ -137,6 +511,13 @@ class UserLikedPlaceTask(RecommendationTask):
                     WHERE pr2.user_id = pr.user_id
                     AND pr2.created_at > t.timestamp - INTERVAL '{self.timedelta} days'
                     AND pr2.created_at <= t.timestamp
+                )
+                OR EXISTS (
+                    SELECT 1
+                    FROM beer_ratings as br
+                    WHERE br.user_id = pr.user_id
+                    AND br.created_at > t.timestamp - INTERVAL '{self.timedelta} days'
+                    AND br.created_at <= t.timestamp
                 )
             GROUP BY
                 t.timestamp,
@@ -279,6 +660,13 @@ class UserLikedBeerTask(RecommendationTask):
 
 # Mapping of task names to their corresponding task classes.
 tasks_dict = {
+    "beer-rating-churn": BeerRatingChurnTask,
+    "user-rating-churn": UserRatingChurnTask,
+    "brewer-dormant": BrewerDormantTask,
+    "beer-rating-count": BeerRatingCountTask,
+    "user-rating-count": UserRatingCountTask,
+    "popular-beer-rating-count": PopularBeerRatingCountTask,
+    "brewer-abv": BrewerABVTask,
     "user-favorite-beer": UserFavoriteBeerTask,
     "user-liked-place": UserLikedPlaceTask,
     "user-place-liked-beer": UserPlaceLikedBeerTask,
