@@ -278,3 +278,10 @@ if __name__ == "__main__":
         print(f'Sample of {table_name} table:')
         print(table.df.head())
         print()
+
+    # Print totals across all tables
+    total_rows = sum(table.df.shape[0] for table in ratebeer_db.table_dict.values())
+    total_cols = sum(table.df.shape[1] for table in ratebeer_db.table_dict.values())
+    print("Totals across all tables:")
+    print(f"Total rows: {total_rows}")
+    print(f"Total columns: {total_cols}")
