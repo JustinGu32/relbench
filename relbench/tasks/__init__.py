@@ -349,7 +349,6 @@ register_task(
 register_task("rel-ratebeer", "beer-rating-churn", ratebeer.BeerRatingChurnTask)
 register_task("rel-ratebeer", "user-rating-churn", ratebeer.UserRatingChurnTask)
 register_task("rel-ratebeer", "brewer-dormant", ratebeer.BrewerDormantTask)
-register_task("rel-ratebeer", "beer-rating-count", ratebeer.BeerRatingCountTask)
 register_task("rel-ratebeer", "user-rating-count", ratebeer.UserRatingCountTask)
 register_task("rel-ratebeer", "brewer-abv", ratebeer.BrewerABVTask)
 register_task("rel-ratebeer", "user-liked-beer", ratebeer.UserLikedBeerTask)

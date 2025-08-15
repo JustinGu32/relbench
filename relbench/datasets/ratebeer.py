@@ -272,16 +272,17 @@ if __name__ == "__main__":
     ratebeer_dataset = RateBeerDataset()
     ratebeer_db = ratebeer_dataset.make_db()
 
+    total_rows = 0
+    total_cols = 0
+
     # Print table statistics
     for table_name, table in ratebeer_db.table_dict.items():
         print(f'Number of rows in {table_name} table: {table.df.shape[0]}')
         print(f'Sample of {table_name} table:')
         print(table.df.head())
         print()
+        total_rows += table.df.shape[0]
+        total_cols += table.df.shape[1]
 
-    # Print totals across all tables
-    total_rows = sum(table.df.shape[0] for table in ratebeer_db.table_dict.values())
-    total_cols = sum(table.df.shape[1] for table in ratebeer_db.table_dict.values())
-    print("Totals across all tables:")
-    print(f"Total rows: {total_rows}")
-    print(f"Total columns: {total_cols}")
+    print(f"Total number of rows: {total_rows}")
+    print(f"Total number of columns: {total_cols}")

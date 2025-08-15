@@ -212,46 +212,6 @@ class BrewerDormantTask(EntityTask):
 
 # Entity Regression tasks
 
-class BeerRatingCountTask(EntityTask):
-    r"""Predict the number of beer ratings that a beer will receive in the next 90 days."""
-
-    task_type = TaskType.REGRESSION
-    entity_col = "beer_id"
-    entity_table = "beers"
-    time_col = "timestamp"
-    target_col = "num_ratings"
-    timedelta = pd.Timedelta(days=90)
-    metrics = [r2, mae, rmse]
-
-    def make_table(self, db: Database, timestamps: "pd.Series[pd.Timestamp]") -> Table:
-        beers = db.table_dict["beers"].df
-        beer_ratings = db.table_dict["beer_ratings"].df
-        timestamp_df = pd.DataFrame({"timestamp": timestamps})
-
-        df = duckdb.sql(
-            f"""
-            SELECT
-                t.timestamp,
-                b.beer_id,
-                (
-                    SELECT COUNT(*)
-                    FROM beer_ratings br
-                    WHERE br.beer_id = b.beer_id
-                    AND br.created_at >  t.timestamp
-                    AND br.created_at <= t.timestamp + INTERVAL '{self.timedelta}'
-                ) AS num_ratings
-            FROM timestamp_df t
-            CROSS JOIN beers b
-            """
-        ).df()
-
-        return Table(
-            df=df,
-            fkey_col_to_pkey_table={self.entity_col: self.entity_table},
-            pkey_col=None,
-            time_col=self.time_col,
-        )
-
 class UserRatingCountTask(EntityTask):
     r"""Predict the number of beer ratings that a user will give in the next 90 days."""
 
@@ -537,7 +497,6 @@ tasks_dict = {
     "beer-rating-churn": BeerRatingChurnTask,
     "user-rating-churn": UserRatingChurnTask,
     "brewer-dormant": BrewerDormantTask,
-    "beer-rating-count": BeerRatingCountTask,
     "user-rating-count": UserRatingCountTask,
     "brewer-abv": BrewerABVTask,
     "user-favorite-beer": UserFavoriteBeerTask,
