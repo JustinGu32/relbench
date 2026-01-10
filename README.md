@@ -22,7 +22,7 @@
 - 40 new predictive tasks, including 28 Autocomplete tasks across new and existing databases.
 - CTU integration: 70+ relational datasets from the CTU repository via [ReDeLEx](https://github.com/jakubpeleska/redelex).
 - Direct SQL database connectivity via [ReDeLEx](https://github.com/jakubpeleska/redelex).
-- 4DBInfer integration: 8 relational datasets from the [4DBInfer](https://github.com/awslabs/multi-table-benchmark) repository in RelBench format.
+- 4DBInfer integration: 7 relational datasets from the [4DBInfer](https://github.com/awslabs/multi-table-benchmark) repository in RelBench format.
 - Bug fixes and performance improvements:
     - Optionally include (time-censored) labels as features in the database. ([#327](https://github.com/snap-stanford/relbench/pull/327))
     - Support NDCG metric for link prediction. ([#276](https://github.com/snap-stanford/relbench/pull/276"))
